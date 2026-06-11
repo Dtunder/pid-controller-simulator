@@ -24,6 +24,37 @@ class TestPID(unittest.TestCase):
         u = pid.update(setpoint=1.0, pv=1.0, dt=1.0)
         self.assertEqual(u, -1.0)
 
+        # test derivative when dt <= 0
+        u2 = pid.update(setpoint=1.0, pv=2.0, dt=0.0)
+        self.assertEqual(u2, 0.0)
+
+    def test_pid_reset(self):
+        pid = PIDController(kp=1.0, ki=1.0, kd=1.0)
+        pid.update(setpoint=1.0, pv=0.0, dt=1.0)
+        self.assertNotEqual(pid.integral, 0.0)
+        self.assertNotEqual(pid.prev_error, 0.0)
+
+        pid.reset()
+        self.assertEqual(pid.integral, 0.0)
+        self.assertEqual(pid.prev_error, 0.0)
+        self.assertEqual(pid.prev_pv, 0.0)
+
+    def test_pid_output_limits_and_antiwindup(self):
+        pid = PIDController(kp=1.0, ki=1.0, kd=0.0, output_limits=(-10.0, 10.0))
+
+        # Drive the integral up to hit the max limit
+        for _ in range(20):
+            u = pid.update(setpoint=1.0, pv=0.0, dt=1.0)
+
+        self.assertEqual(u, 10.0)
+
+        # Test negative limit
+        pid.reset()
+        for _ in range(20):
+            u = pid.update(setpoint=-1.0, pv=0.0, dt=1.0)
+
+        self.assertEqual(u, -10.0)
+
     def test_first_order_system(self):
         sys = FirstOrderSystem(K=2.0, tau=1.0, dead_time=0.0)
         # Without dead time, step response should start immediately
@@ -52,6 +83,41 @@ class TestPID(unittest.TestCase):
         self.assertTrue(kp > 0)
         self.assertTrue(ki > 0)
         self.assertTrue(kd > 0)
+
+    def test_ziegler_nichols_failure(self):
+        # A system that won't oscillate properly within the given time or limits
+        # High tau and no dead time won't easily oscillate
+        sys = FirstOrderSystem(K=0.1, tau=10.0, dead_time=0.0)
+
+        # We can also mock `detect_oscillations` to always return False to test this branch safely
+        from unittest.mock import patch
+        with patch('pid.detect_oscillations', return_value=(False, 0.0, 0.0)):
+            kp, ki, kd = ziegler_nichols_tuning(sys, setpoint=1.0, dt=0.01, max_time=5.0)
+            self.assertEqual(kp, 0.0)
+            self.assertEqual(ki, 0.0)
+            self.assertEqual(kd, 0.0)
+
+    def test_simulate_and_save(self):
+        import os
+        sys = FirstOrderSystem(K=1.0, tau=1.0, dead_time=0.5)
+        pid = PIDController(kp=1.0, ki=1.0, kd=0.0)
+        filename = "test_results.csv"
+
+        # Ensure cleanup happens even if assertions fail
+        self.addCleanup(lambda: os.remove(filename) if os.path.exists(filename) else None)
+
+        from pid import simulate_and_save
+        results = simulate_and_save(sys, pid, filename, duration=1.0)
+
+        self.assertTrue(os.path.exists(filename))
+        self.assertTrue(len(results) > 0)
+
+    def test_detect_oscillations_early_exit(self):
+        from pid import detect_oscillations
+        # Not enough samples
+        is_osc, period, amp_ratio = detect_oscillations([0.0]*50, 0.1)
+        self.assertFalse(is_osc)
+        self.assertEqual(period, 0.0)
 
 if __name__ == '__main__':
     unittest.main()
