@@ -1,7 +1,18 @@
 import unittest
+import logging
 from pid import PIDController, FirstOrderSystem, ziegler_nichols_tuning
 
 class TestPID(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        # Suppress logging output during tests
+        logging.disable(logging.CRITICAL)
+
+    @classmethod
+    def tearDownClass(cls):
+        # Re-enable logging after tests
+        logging.disable(logging.NOTSET)
+
     def test_pid_proportional(self):
         pid = PIDController(kp=2.0, ki=0.0, kd=0.0)
         u1 = pid.update(setpoint=10.0, pv=0.0, dt=1.0)

@@ -1,14 +1,23 @@
 import csv
 import math
+import logging
 from collections import deque
+
+logger = logging.getLogger(__name__)
 
 def _check_type_and_value(val, name, expected_types=(int, float), min_val=None, max_val=None):
     if not isinstance(val, expected_types):
-        raise TypeError(f"{name} must be of type {expected_types}, got {type(val).__name__}")
+        err_msg = f"{name} must be of type {expected_types}, got {type(val).__name__}"
+        logger.error(err_msg)
+        raise TypeError(err_msg)
     if min_val is not None and val < min_val:
-        raise ValueError(f"{name} must be >= {min_val}, got {val}")
+        err_msg = f"{name} must be >= {min_val}, got {val}"
+        logger.error(err_msg)
+        raise ValueError(err_msg)
     if max_val is not None and val > max_val:
-        raise ValueError(f"{name} must be <= {max_val}, got {val}")
+        err_msg = f"{name} must be <= {max_val}, got {val}"
+        logger.error(err_msg)
+        raise ValueError(err_msg)
 
 class PIDController:
     """A standard PID controller implementation with anti-windup and output limits."""
@@ -28,15 +37,23 @@ class PIDController:
         _check_type_and_value(kd, "kd", min_val=0.0)
         
         if not isinstance(output_limits, tuple) or len(output_limits) != 2:
-            raise ValueError("output_limits must be a tuple of length 2")
+            err_msg = "output_limits must be a tuple of length 2"
+            logger.error(err_msg)
+            raise ValueError(err_msg)
             
         min_limit, max_limit = output_limits
         if min_limit is not None and not isinstance(min_limit, (int, float)):
-            raise TypeError("output_limits[0] must be None, int, or float")
+            err_msg = "output_limits[0] must be None, int, or float"
+            logger.error(err_msg)
+            raise TypeError(err_msg)
         if max_limit is not None and not isinstance(max_limit, (int, float)):
-            raise TypeError("output_limits[1] must be None, int, or float")
+            err_msg = "output_limits[1] must be None, int, or float"
+            logger.error(err_msg)
+            raise TypeError(err_msg)
         if min_limit is not None and max_limit is not None and min_limit > max_limit:
-            raise ValueError(f"min_limit ({min_limit}) cannot be greater than max_limit ({max_limit})")
+            err_msg = f"min_limit ({min_limit}) cannot be greater than max_limit ({max_limit})"
+            logger.error(err_msg)
+            raise ValueError(err_msg)
 
         self.kp = float(kp)
         self.ki = float(ki)
@@ -46,12 +63,14 @@ class PIDController:
         self.integral = 0.0
         self.prev_error = 0.0
         self.prev_pv = 0.0
+        logger.info("PIDController initialized", extra={"extra_info": {"kp": self.kp, "ki": self.ki, "kd": self.kd, "output_limits": self.output_limits}})
 
     def reset(self):
         """Resets the internal state of the PID controller."""
         self.integral = 0.0
         self.prev_error = 0.0
         self.prev_pv = 0.0
+        logger.debug("PIDController state reset")
 
     def update(self, setpoint, pv, dt):
         """
@@ -69,7 +88,9 @@ class PIDController:
         _check_type_and_value(pv, "pv")
         _check_type_and_value(dt, "dt", min_val=0.0)
         if dt <= 0:
-            raise ValueError(f"dt must be > 0, got {dt}")
+            err_msg = f"dt must be > 0, got {dt}"
+            logger.error(err_msg)
+            raise ValueError(err_msg)
             
         error = setpoint - pv
         
@@ -93,9 +114,11 @@ class PIDController:
         if max_limit is not None and output > max_limit:
             output = max_limit
             self.integral -= error * dt # anti-windup
+            logger.debug("Output hit max limit, applying anti-windup", extra={"extra_info": {"max_limit": max_limit, "output": output}})
         elif min_limit is not None and output < min_limit:
             output = min_limit
             self.integral -= error * dt # anti-windup
+            logger.debug("Output hit min limit, applying anti-windup", extra={"extra_info": {"min_limit": min_limit, "output": output}})
             
         self.prev_error = error
         self.prev_pv = pv
@@ -118,18 +141,22 @@ class FirstOrderSystem:
         self.history_u = deque()
         self._delay_steps_cache = None
         self._dt_cache = None
+        logger.info("FirstOrderSystem initialized", extra={"extra_info": {"K": self.K, "tau": self.tau, "dead_time": self.dead_time}})
         
     def reset(self):
         """Resets the system state to initial conditions."""
         self.y = 0.0
         self.history_u.clear()
+        logger.debug("FirstOrderSystem state reset")
         
     def update(self, u, dt):
         """Updates the system state given a new input u and time step dt."""
         _check_type_and_value(u, "u")
         _check_type_and_value(dt, "dt", min_val=0.0)
         if dt <= 0:
-            raise ValueError(f"dt must be > 0, got {dt}")
+            err_msg = f"dt must be > 0, got {dt}"
+            logger.error(err_msg)
+            raise ValueError(err_msg)
             
         self.history_u.append(u)
         
@@ -167,10 +194,14 @@ def detect_oscillations(history_y, dt):
         tuple: (is_oscillating, period, amplitude_ratio)
     """
     if not isinstance(history_y, list):
-        raise TypeError(f"history_y must be a list, got {type(history_y).__name__}")
+        err_msg = f"history_y must be a list, got {type(history_y).__name__}"
+        logger.error(err_msg)
+        raise TypeError(err_msg)
     _check_type_and_value(dt, "dt", min_val=0.0)
     if dt <= 0:
-        raise ValueError(f"dt must be > 0, got {dt}")
+        err_msg = f"dt must be > 0, got {dt}"
+        logger.error(err_msg)
+        raise ValueError(err_msg)
         
     # Needs some buffer to avoid initial transient
     n = len(history_y)
@@ -231,16 +262,22 @@ def ziegler_nichols_tuning(system, setpoint=1.0, dt=0.01, max_time=50.0):
         tuple: (kp, ki, kd) The tuned PID parameters.
     """
     if not isinstance(system, FirstOrderSystem):
-        raise TypeError(f"system must be a FirstOrderSystem, got {type(system).__name__}")
+        err_msg = f"system must be a FirstOrderSystem, got {type(system).__name__}"
+        logger.error(err_msg)
+        raise TypeError(err_msg)
     _check_type_and_value(setpoint, "setpoint")
     _check_type_and_value(dt, "dt", min_val=0.0)
     if dt <= 0:
-        raise ValueError(f"dt must be > 0, got {dt}")
+        err_msg = f"dt must be > 0, got {dt}"
+        logger.error(err_msg)
+        raise ValueError(err_msg)
     _check_type_and_value(max_time, "max_time", min_val=0.0)
     if max_time <= 0:
-        raise ValueError(f"max_time must be > 0, got {max_time}")
+        err_msg = f"max_time must be > 0, got {max_time}"
+        logger.error(err_msg)
+        raise ValueError(err_msg)
         
-    print("Starting Ziegler-Nichols tuning...")
+    logger.info("Starting Ziegler-Nichols tuning...")
     
     ku = 0.0
     tu = 0.0
@@ -260,7 +297,7 @@ def ziegler_nichols_tuning(system, setpoint=1.0, dt=0.01, max_time=50.0):
     half_steps = max_steps // 2
     
     for iteration in range(20):
-        print(f"Step {iteration+1}: Testing Kp = {kp_test:.3f}")
+        logger.debug(f"Step {iteration+1}: Testing Kp = {kp_test:.3f}", extra={"extra_info": {"iteration": iteration+1, "kp_test": kp_test}})
         
         controller = PIDController(kp_test, 0, 0)
         system.reset()
@@ -291,16 +328,16 @@ def ziegler_nichols_tuning(system, setpoint=1.0, dt=0.01, max_time=50.0):
         _, _, final_amp_ratio = detect_oscillations(history_y, dt)
         
         if is_oscillating:
-            print(f"  -> Stable oscillations detected! Period Tu = {period:.3f}s")
+            logger.info(f"Stable oscillations detected", extra={"extra_info": {"period_Tu": period}})
             ku = kp_test
             tu = period
             break
         elif final_amp_ratio > 1.05 or diverged:
-            print("  -> Unstable (growing oscillations or diverging). Decreasing Kp.")
+            logger.debug("Unstable (growing oscillations or diverging). Decreasing Kp.")
             high_kp = kp_test
             kp_test = (low_kp + high_kp) / 2
         else:
-            print("  -> Stable (decaying oscillations or no oscillations). Increasing Kp.")
+            logger.debug("Stable (decaying oscillations or no oscillations). Increasing Kp.")
             low_kp = kp_test
             if high_kp is None:
                 kp_test *= 2.0
@@ -308,39 +345,45 @@ def ziegler_nichols_tuning(system, setpoint=1.0, dt=0.01, max_time=50.0):
                 kp_test = (low_kp + high_kp) / 2
                 
     if ku == 0.0:
-        print("Failed to find ultimate gain.")
+        logger.warning("Failed to find ultimate gain.")
         return 0.0, 0.0, 0.0
         
-    print(f"Found Ultimate Gain (Ku) = {ku:.3f}")
-    print(f"Found Ultimate Period (Tu) = {tu:.3f}")
+    logger.info("Found Ultimate Gain and Period", extra={"extra_info": {"Ku": ku, "Tu": tu}})
     
     # Classic Z-N PID rules
     kp = 0.6 * ku
     ki = 1.2 * ku / tu
     kd = 0.075 * ku * tu
     
-    print(f"Ziegler-Nichols PID parameters:")
-    print(f"Kp = {kp:.3f}")
-    print(f"Ki = {ki:.3f}")
-    print(f"Kd = {kd:.3f}")
+    logger.info("Ziegler-Nichols PID parameters calculated", extra={"extra_info": {"Kp": kp, "Ki": ki, "Kd": kd}})
     
     return kp, ki, kd
 
 def simulate_and_save(system, controller, filename, setpoint=1.0, dt=0.01, duration=20.0):
     if not isinstance(system, FirstOrderSystem):
-        raise TypeError(f"system must be a FirstOrderSystem, got {type(system).__name__}")
+        err_msg = f"system must be a FirstOrderSystem, got {type(system).__name__}"
+        logger.error(err_msg)
+        raise TypeError(err_msg)
     if not isinstance(controller, PIDController):
-        raise TypeError(f"controller must be a PIDController, got {type(controller).__name__}")
+        err_msg = f"controller must be a PIDController, got {type(controller).__name__}"
+        logger.error(err_msg)
+        raise TypeError(err_msg)
     if not isinstance(filename, str) or not filename:
-        raise ValueError("filename must be a non-empty string")
+        err_msg = "filename must be a non-empty string"
+        logger.error(err_msg)
+        raise ValueError(err_msg)
         
     _check_type_and_value(setpoint, "setpoint")
     _check_type_and_value(dt, "dt", min_val=0.0)
     if dt <= 0:
-        raise ValueError(f"dt must be > 0, got {dt}")
+        err_msg = f"dt must be > 0, got {dt}"
+        logger.error(err_msg)
+        raise ValueError(err_msg)
     _check_type_and_value(duration, "duration", min_val=0.0)
     if duration <= 0:
-        raise ValueError(f"duration must be > 0, got {duration}")
+        err_msg = f"duration must be > 0, got {duration}"
+        logger.error(err_msg)
+        raise ValueError(err_msg)
         
     system.reset()
     controller.reset()
@@ -350,7 +393,9 @@ def simulate_and_save(system, controller, filename, setpoint=1.0, dt=0.01, durat
     try:
         num_steps = int(duration / dt)
     except Exception as e:
-        raise ValueError(f"Invalid duration or dt: {e}")
+        err_msg = f"Invalid duration or dt: {e}"
+        logger.error(err_msg, exc_info=True)
+        raise ValueError(err_msg)
         
     for i in range(num_steps):
         t = i * dt
@@ -366,7 +411,9 @@ def simulate_and_save(system, controller, filename, setpoint=1.0, dt=0.01, durat
             writer.writerow(['time', 'setpoint', 'process_variable', 'control_variable'])
             writer.writerows(results)
     except IOError as e:
-        raise IOError(f"Failed to write to file {filename}: {e}")
+        err_msg = f"Failed to write to file {filename}: {e}"
+        logger.error(err_msg, exc_info=True)
+        raise IOError(err_msg)
         
-    print(f"Simulation saved to {filename}")
+    logger.info(f"Simulation saved to {filename}")
     return results

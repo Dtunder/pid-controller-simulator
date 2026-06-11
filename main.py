@@ -1,28 +1,35 @@
+import logging
+from logger_setup import configure_logging
 from pid import PIDController, FirstOrderSystem, ziegler_nichols_tuning, simulate_and_save
 
+logger = logging.getLogger(__name__)
+
 def main():
-    print("Welcome to pid-controller-simulator!")
+    configure_logging()
+    logger.info("Welcome to pid-controller-simulator!")
     
     # Define system parameters
     K = 1.0
     tau = 1.0
     dead_time = 0.5
     
-    print(f"\nSystem defined as First Order Plus Dead Time (FOPDT):")
-    print(f"K={K}, tau={tau}, dead_time={dead_time}")
+    logger.info(
+        "System defined as First Order Plus Dead Time (FOPDT)",
+        extra={"extra_info": {"K": K, "tau": tau, "dead_time": dead_time}}
+    )
     
     system = FirstOrderSystem(K, tau, dead_time)
     
     # Tune PID
-    print("\n--- Tuning Phase ---")
+    logger.info("Starting Tuning Phase")
     kp, ki, kd = ziegler_nichols_tuning(system, setpoint=1.0, dt=0.01, max_time=50.0)
     
     if kp == 0.0 and ki == 0.0 and kd == 0.0:
-        print("Tuning failed, exiting.")
+        logger.error("Tuning failed, exiting.")
         return
         
     # Setup PID with tuned parameters
-    print("\n--- Simulation Phase ---")
+    logger.info("Starting Simulation Phase")
     controller = PIDController(kp, ki, kd)
     
     # Run final simulation
