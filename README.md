@@ -21,23 +21,45 @@ python -m unittest test_pid.py
 
 ## Configuration Setup
 
-The simulation parameters can be configured directly in `main.py` before running the simulation. Look for the system definition section to adjust the First Order Plus Dead Time (FOPDT) characteristics:
+The simulation parameters are configured using a `config.json` file located in the root directory, or via environment variables.
 
-```python
-# main.py
-K = 1.0         # System gain
-tau = 1.0       # System time constant
-dead_time = 0.5 # System delay / dead time
+### Using `config.json`
+A default `config.json` looks like this:
+
+```json
+{
+  "system": {
+    "K": 1.0,
+    "tau": 1.0,
+    "dead_time": 0.5
+  },
+  "tuning": {
+    "setpoint": 1.0,
+    "dt": 0.01,
+    "max_time": 50.0
+  },
+  "simulation": {
+    "setpoint": 1.0,
+    "dt": 0.01,
+    "duration": 30.0,
+    "output_file": "results.csv"
+  },
+  "logging": {
+    "level": "INFO"
+  }
+}
 ```
+
+### Using Environment Variables
+You can override any configuration value using environment variables with the prefix `APP_` followed by the section and key in uppercase.
+For example:
+- To change the system gain `K` to 2.0: `export APP_SYSTEM_K=2.0`
+- To change the simulation duration to 15.0: `export APP_SIMULATION_DURATION=15.0`
+- To change the logging level to DEBUG: `export APP_LOGGING_LEVEL=DEBUG`
 
 ### Logging Setup
 
-The logging system is configured using `logger_setup.py`, which sets up a JSON formatter. Logs are output directly to the console. To change logging verbosity, you can modify the `configure_logging` function in `logger_setup.py`:
-
-```python
-# logger_setup.py
-logger.setLevel(logging.INFO) # Change to logging.DEBUG for more verbose output
-```
+The logging system is configured to output structured JSON logs to the console. The logging level is controlled by the `logging.level` setting in your configuration (e.g., in `config.json` or via `APP_LOGGING_LEVEL`).
 
 ## API Reference Documentation
 

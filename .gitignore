@@ -6,3 +6,4 @@ venv/
 .coverage
 .coverage
 results.csv
+config.json

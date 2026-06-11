@@ -37,15 +37,23 @@ class JSONFormatter(logging.Formatter):
             
         return json.dumps(log_record)
 
-def configure_logging() -> None:
+def configure_logging(level: str = "INFO") -> None:
     """
     Configures the root logger to use the JSON formatter and output to the console.
     
-    This function sets the logging level to INFO, clears any existing handlers
-    on the root logger, and adds a StreamHandler configured with the JSONFormatter.
+    This function sets the logging level to the specified level (default INFO), clears any 
+    existing handlers on the root logger, and adds a StreamHandler configured with the JSONFormatter.
+    
+    Args:
+        level (str): The logging level to set (e.g., "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL").
     """
     logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
+    
+    numeric_level = getattr(logging, level.upper(), None)
+    if not isinstance(numeric_level, int):
+        numeric_level = logging.INFO
+        
+    logger.setLevel(numeric_level)
     
     # Remove existing handlers if any
     for handler in logger.handlers[:]:
