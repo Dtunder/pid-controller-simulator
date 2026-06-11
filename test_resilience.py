@@ -1,6 +1,5 @@
 import unittest
 import logging
-from unittest.mock import patch, MagicMock
 from resilience import (
     retry_with_fallback,
     ConnectionFailure,

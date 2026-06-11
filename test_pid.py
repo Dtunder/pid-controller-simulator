@@ -129,7 +129,7 @@ class TestPID(unittest.TestCase):
     def test_detect_oscillations_early_exit(self) -> None:
         from pid import detect_oscillations
         # Not enough samples
-        is_osc, period, amp_ratio = detect_oscillations([0.0]*50, 0.1)
+        is_osc, period, _ = detect_oscillations([0.0]*50, 0.1)
         self.assertFalse(is_osc)
         self.assertEqual(period, 0.0)
 
