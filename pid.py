@@ -1,11 +1,34 @@
 import csv
 import math
 
+def _check_type_and_value(val, name, expected_types=(int, float), min_val=None, max_val=None):
+    if not isinstance(val, expected_types):
+        raise TypeError(f"{name} must be of type {expected_types}, got {type(val).__name__}")
+    if min_val is not None and val < min_val:
+        raise ValueError(f"{name} must be >= {min_val}, got {val}")
+    if max_val is not None and val > max_val:
+        raise ValueError(f"{name} must be <= {max_val}, got {val}")
+
 class PIDController:
     def __init__(self, kp, ki, kd, output_limits=(None, None)):
-        self.kp = kp
-        self.ki = ki
-        self.kd = kd
+        _check_type_and_value(kp, "kp", min_val=0.0)
+        _check_type_and_value(ki, "ki", min_val=0.0)
+        _check_type_and_value(kd, "kd", min_val=0.0)
+        
+        if not isinstance(output_limits, tuple) or len(output_limits) != 2:
+            raise ValueError("output_limits must be a tuple of length 2")
+            
+        min_limit, max_limit = output_limits
+        if min_limit is not None and not isinstance(min_limit, (int, float)):
+            raise TypeError("output_limits[0] must be None, int, or float")
+        if max_limit is not None and not isinstance(max_limit, (int, float)):
+            raise TypeError("output_limits[1] must be None, int, or float")
+        if min_limit is not None and max_limit is not None and min_limit > max_limit:
+            raise ValueError(f"min_limit ({min_limit}) cannot be greater than max_limit ({max_limit})")
+
+        self.kp = float(kp)
+        self.ki = float(ki)
+        self.kd = float(kd)
         self.output_limits = output_limits
         
         self.integral = 0.0
@@ -18,6 +41,12 @@ class PIDController:
         self.prev_pv = 0.0
 
     def update(self, setpoint, pv, dt):
+        _check_type_and_value(setpoint, "setpoint")
+        _check_type_and_value(pv, "pv")
+        _check_type_and_value(dt, "dt", min_val=0.0)
+        if dt <= 0:
+            raise ValueError(f"dt must be > 0, got {dt}")
+            
         error = setpoint - pv
         
         # Proportional
@@ -31,7 +60,7 @@ class PIDController:
         # Note: on first step prev_pv is 0 if not initialized properly, 
         # but reset or setting it outside can fix it.
         # Here we just use standard derivative on error for simplicity
-        d = self.kd * (error - self.prev_error) / dt if dt > 0 else 0.0
+        d = self.kd * (error - self.prev_error) / dt
         
         output = p + i + d
         
@@ -51,9 +80,13 @@ class PIDController:
 
 class FirstOrderSystem:
     def __init__(self, K, tau, dead_time):
-        self.K = K
-        self.tau = tau
-        self.dead_time = dead_time
+        _check_type_and_value(K, "K")
+        _check_type_and_value(tau, "tau", min_val=1e-9) # tau > 0, slightly larger than 0 to avoid div by zero
+        _check_type_and_value(dead_time, "dead_time", min_val=0.0)
+        
+        self.K = float(K)
+        self.tau = float(tau)
+        self.dead_time = float(dead_time)
         
         self.y = 0.0
         self.history_u = []
@@ -63,6 +96,11 @@ class FirstOrderSystem:
         self.history_u = []
         
     def update(self, u, dt):
+        _check_type_and_value(u, "u")
+        _check_type_and_value(dt, "dt", min_val=0.0)
+        if dt <= 0:
+            raise ValueError(f"dt must be > 0, got {dt}")
+            
         self.history_u.append(u)
         delay_steps = int(self.dead_time / dt)
         
@@ -77,6 +115,12 @@ class FirstOrderSystem:
         return self.y
 
 def detect_oscillations(history_y, dt):
+    if not isinstance(history_y, list):
+        raise TypeError(f"history_y must be a list, got {type(history_y).__name__}")
+    _check_type_and_value(dt, "dt", min_val=0.0)
+    if dt <= 0:
+        raise ValueError(f"dt must be > 0, got {dt}")
+        
     # Find peaks and troughs
     peaks = []
     troughs = []
@@ -114,6 +158,16 @@ def detect_oscillations(history_y, dt):
     return False, 0.0, 0.0
 
 def ziegler_nichols_tuning(system, setpoint=1.0, dt=0.01, max_time=50.0):
+    if not isinstance(system, FirstOrderSystem):
+        raise TypeError(f"system must be a FirstOrderSystem, got {type(system).__name__}")
+    _check_type_and_value(setpoint, "setpoint")
+    _check_type_and_value(dt, "dt", min_val=0.0)
+    if dt <= 0:
+        raise ValueError(f"dt must be > 0, got {dt}")
+    _check_type_and_value(max_time, "max_time", min_val=0.0)
+    if max_time <= 0:
+        raise ValueError(f"max_time must be > 0, got {max_time}")
+        
     print("Starting Ziegler-Nichols tuning...")
     
     ku = 0.0
@@ -192,12 +246,32 @@ def ziegler_nichols_tuning(system, setpoint=1.0, dt=0.01, max_time=50.0):
     return kp, ki, kd
 
 def simulate_and_save(system, controller, filename, setpoint=1.0, dt=0.01, duration=20.0):
+    if not isinstance(system, FirstOrderSystem):
+        raise TypeError(f"system must be a FirstOrderSystem, got {type(system).__name__}")
+    if not isinstance(controller, PIDController):
+        raise TypeError(f"controller must be a PIDController, got {type(controller).__name__}")
+    if not isinstance(filename, str) or not filename:
+        raise ValueError("filename must be a non-empty string")
+        
+    _check_type_and_value(setpoint, "setpoint")
+    _check_type_and_value(dt, "dt", min_val=0.0)
+    if dt <= 0:
+        raise ValueError(f"dt must be > 0, got {dt}")
+    _check_type_and_value(duration, "duration", min_val=0.0)
+    if duration <= 0:
+        raise ValueError(f"duration must be > 0, got {duration}")
+        
     system.reset()
     controller.reset()
     
     results = []
     
-    for i in range(int(duration / dt)):
+    try:
+        num_steps = int(duration / dt)
+    except Exception as e:
+        raise ValueError(f"Invalid duration or dt: {e}")
+        
+    for i in range(num_steps):
         t = i * dt
         pv = system.y
         cv = controller.update(setpoint, pv, dt)
@@ -205,10 +279,13 @@ def simulate_and_save(system, controller, filename, setpoint=1.0, dt=0.01, durat
         
         results.append((t, setpoint, pv, cv))
         
-    with open(filename, 'w', newline='') as f:
-        writer = csv.writer(f)
-        writer.writerow(['time', 'setpoint', 'process_variable', 'control_variable'])
-        writer.writerows(results)
+    try:
+        with open(filename, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(['time', 'setpoint', 'process_variable', 'control_variable'])
+            writer.writerows(results)
+    except IOError as e:
+        raise IOError(f"Failed to write to file {filename}: {e}")
         
     print(f"Simulation saved to {filename}")
     return results

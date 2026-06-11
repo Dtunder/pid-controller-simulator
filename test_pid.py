@@ -24,9 +24,12 @@ class TestPID(unittest.TestCase):
         u = pid.update(setpoint=1.0, pv=1.0, dt=1.0)
         self.assertEqual(u, -1.0)
 
-        # test derivative when dt <= 0
-        u2 = pid.update(setpoint=1.0, pv=2.0, dt=0.0)
-        self.assertEqual(u2, 0.0)
+        # test derivative when dt <= 0 should raise ValueError
+        with self.assertRaises(ValueError):
+            pid.update(setpoint=1.0, pv=2.0, dt=0.0)
+            
+        with self.assertRaises(ValueError):
+            pid.update(setpoint=1.0, pv=2.0, dt=-1.0)
 
     def test_pid_reset(self):
         pid = PIDController(kp=1.0, ki=1.0, kd=1.0)
@@ -118,6 +121,59 @@ class TestPID(unittest.TestCase):
         is_osc, period, amp_ratio = detect_oscillations([0.0]*50, 0.1)
         self.assertFalse(is_osc)
         self.assertEqual(period, 0.0)
+
+    def test_invalid_types_and_values(self):
+        # PIDController init
+        with self.assertRaises(TypeError):
+            PIDController(kp="1.0", ki=0.0, kd=0.0)
+        with self.assertRaises(ValueError):
+            PIDController(kp=-1.0, ki=0.0, kd=0.0)
+        with self.assertRaises(ValueError):
+            PIDController(kp=1.0, ki=0.0, kd=0.0, output_limits=(10.0, 0.0))
+            
+        # FirstOrderSystem init
+        with self.assertRaises(TypeError):
+            FirstOrderSystem(K=1.0, tau="1.0", dead_time=0.0)
+        with self.assertRaises(ValueError):
+            FirstOrderSystem(K=1.0, tau=0.0, dead_time=0.0)
+        with self.assertRaises(ValueError):
+            FirstOrderSystem(K=1.0, tau=1.0, dead_time=-1.0)
+            
+        # Update methods
+        pid = PIDController(kp=1.0, ki=0.0, kd=0.0)
+        sys = FirstOrderSystem(K=1.0, tau=1.0, dead_time=0.0)
+        
+        with self.assertRaises(TypeError):
+            pid.update(setpoint="1.0", pv=0.0, dt=1.0)
+        with self.assertRaises(ValueError):
+            pid.update(setpoint=1.0, pv=0.0, dt=-1.0)
+            
+        with self.assertRaises(TypeError):
+            sys.update(u="1.0", dt=1.0)
+        with self.assertRaises(ValueError):
+            sys.update(u=1.0, dt=-0.1)
+            
+        # Detect oscillations
+        from pid import detect_oscillations
+        with self.assertRaises(TypeError):
+            detect_oscillations("not a list", dt=1.0)
+        with self.assertRaises(ValueError):
+            detect_oscillations([1.0, 2.0], dt=0.0)
+            
+        # Z-N tuning
+        with self.assertRaises(TypeError):
+            ziegler_nichols_tuning("not a system", setpoint=1.0, dt=0.01)
+        with self.assertRaises(ValueError):
+            ziegler_nichols_tuning(sys, setpoint=1.0, dt=-0.01)
+            
+        # Simulate and save
+        from pid import simulate_and_save
+        with self.assertRaises(TypeError):
+            simulate_and_save("not a system", pid, "test.csv")
+        with self.assertRaises(ValueError):
+            simulate_and_save(sys, pid, "")
+        with self.assertRaises(ValueError):
+            simulate_and_save(sys, pid, "test.csv", duration=-1.0)
 
 if __name__ == '__main__':
     unittest.main()
