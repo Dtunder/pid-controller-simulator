@@ -1,11 +1,18 @@
 import csv
-import math
 import logging
 from collections import deque
+from typing import Any, List, Optional, Tuple, Type, Union
 
 logger = logging.getLogger(__name__)
 
-def _check_type_and_value(val, name, expected_types=(int, float), min_val=None, max_val=None):
+
+def _check_type_and_value(
+    val: Any,
+    name: str,
+    expected_types: Union[Type, Tuple[Type, ...]] = (int, float),
+    min_val: Optional[float] = None,
+    max_val: Optional[float] = None,
+) -> None:
     """
     Validates the type and value of a parameter.
     
@@ -33,13 +40,20 @@ def _check_type_and_value(val, name, expected_types=(int, float), min_val=None, 
         logger.error(err_msg)
         raise ValueError(err_msg)
 
+
 class PIDController:
     """
-    A standard Proportional-Integral-Derivative (PID) controller implementation 
+    A standard Proportional-Integral-Derivative (PID) controller implementation
     with anti-windup and output limits.
     """
-    
-    def __init__(self, kp, ki, kd, output_limits=(None, None)):
+
+    def __init__(
+        self,
+        kp: float,
+        ki: float,
+        kd: float,
+        output_limits: Tuple[Optional[float], Optional[float]] = (None, None),
+    ) -> None:
         """
         Initializes the PID Controller.
         
@@ -77,12 +91,22 @@ class PIDController:
         self.kd = float(kd)
         self.output_limits = output_limits
         
-        self.integral = 0.0
-        self.prev_error = 0.0
-        self.prev_pv = 0.0
-        logger.info("PIDController initialized", extra={"extra_info": {"kp": self.kp, "ki": self.ki, "kd": self.kd, "output_limits": self.output_limits}})
+        self.integral: float = 0.0
+        self.prev_error: float = 0.0
+        self.prev_pv: float = 0.0
+        logger.info(
+            "PIDController initialized",
+            extra={
+                "extra_info": {
+                    "kp": self.kp,
+                    "ki": self.ki,
+                    "kd": self.kd,
+                    "output_limits": self.output_limits,
+                }
+            },
+        )
 
-    def reset(self):
+    def reset(self) -> None:
         """
         Resets the internal state of the PID controller.
         
@@ -94,7 +118,7 @@ class PIDController:
         self.prev_pv = 0.0
         logger.debug("PIDController state reset")
 
-    def update(self, setpoint, pv, dt):
+    def update(self, setpoint: float, pv: float, dt: float) -> float:
         """
         Calculates the new control variable output.
         
@@ -135,17 +159,24 @@ class PIDController:
         min_limit, max_limit = self.output_limits
         if max_limit is not None and output > max_limit:
             output = max_limit
-            self.integral -= error * dt # anti-windup
-            logger.debug("Output hit max limit, applying anti-windup", extra={"extra_info": {"max_limit": max_limit, "output": output}})
+            self.integral -= error * dt  # anti-windup
+            logger.debug(
+                "Output hit max limit, applying anti-windup",
+                extra={"extra_info": {"max_limit": max_limit, "output": output}},
+            )
         elif min_limit is not None and output < min_limit:
             output = min_limit
-            self.integral -= error * dt # anti-windup
-            logger.debug("Output hit min limit, applying anti-windup", extra={"extra_info": {"min_limit": min_limit, "output": output}})
-            
+            self.integral -= error * dt  # anti-windup
+            logger.debug(
+                "Output hit min limit, applying anti-windup",
+                extra={"extra_info": {"min_limit": min_limit, "output": output}},
+            )
+
         self.prev_error = error
         self.prev_pv = pv
-        
+
         return output
+
 
 class FirstOrderSystem:
     """
@@ -154,8 +185,8 @@ class FirstOrderSystem:
     The system is represented by the differential equation:
     tau * dy/dt + y(t) = K * u(t - dead_time)
     """
-    
-    def __init__(self, K, tau, dead_time):
+
+    def __init__(self, K: float, tau: float, dead_time: float) -> None:
         """
         Initializes the First Order System.
         
@@ -175,14 +206,17 @@ class FirstOrderSystem:
         self.K = float(K)
         self.tau = float(tau)
         self.dead_time = float(dead_time)
-        
-        self.y = 0.0
-        self.history_u = deque()
-        self._delay_steps_cache = None
-        self._dt_cache = None
-        logger.info("FirstOrderSystem initialized", extra={"extra_info": {"K": self.K, "tau": self.tau, "dead_time": self.dead_time}})
-        
-    def reset(self):
+
+        self.y: float = 0.0
+        self.history_u: deque = deque()
+        self._delay_steps_cache: Optional[int] = None
+        self._dt_cache: Optional[float] = None
+        logger.info(
+            "FirstOrderSystem initialized",
+            extra={"extra_info": {"K": self.K, "tau": self.tau, "dead_time": self.dead_time}},
+        )
+
+    def reset(self) -> None:
         """
         Resets the system state to initial conditions.
         
@@ -191,8 +225,8 @@ class FirstOrderSystem:
         self.y = 0.0
         self.history_u.clear()
         logger.debug("FirstOrderSystem state reset")
-        
-    def update(self, u, dt):
+
+    def update(self, u: float, dt: float) -> float:
         """
         Updates the system state given a new input and time step.
         
@@ -238,7 +272,8 @@ class FirstOrderSystem:
         self.y += dy * dt
         return self.y
 
-def detect_oscillations(history_y, dt):
+
+def detect_oscillations(history_y: List[float], dt: float) -> Tuple[bool, float, float]:
     """
     Detects if the system output is oscillating at a constant amplitude.
     
@@ -304,7 +339,10 @@ def detect_oscillations(history_y, dt):
         
     return False, 0.0, 0.0
 
-def ziegler_nichols_tuning(system, setpoint=1.0, dt=0.01, max_time=50.0):
+
+def ziegler_nichols_tuning(
+    system: FirstOrderSystem, setpoint: float = 1.0, dt: float = 0.01, max_time: float = 50.0
+) -> Tuple[float, float, float]:
     """
     Performs Ziegler-Nichols tuning on a given system to find optimal PID parameters.
     
@@ -339,26 +377,29 @@ def ziegler_nichols_tuning(system, setpoint=1.0, dt=0.01, max_time=50.0):
     tu = 0.0
     
     # Try increasing Kp
-    kp_test = 0.1
-    kp_step = 0.1
-    max_kp = 100.0
-    
+    kp_test: float = 0.1
+    kp_step: float = 0.1  # noqa: F841
+    max_kp: float = 100.0  # noqa: F841
+
     # Use binary search-like approach or gradual increase
     # To find marginal stability
-    
-    low_kp = 0.0
-    high_kp = None
+
+    low_kp: float = 0.0
+    high_kp: Optional[float] = None
     
     max_steps = int(max_time / dt)
     half_steps = max_steps // 2
-    
+
     for iteration in range(20):
-        logger.debug(f"Step {iteration+1}: Testing Kp = {kp_test:.3f}", extra={"extra_info": {"iteration": iteration+1, "kp_test": kp_test}})
-        
+        logger.debug(
+            f"Step {iteration+1}: Testing Kp = {kp_test:.3f}",
+            extra={"extra_info": {"iteration": iteration + 1, "kp_test": kp_test}},
+        )
+
         controller = PIDController(kp_test, 0, 0)
         system.reset()
-        
-        history_y = []
+
+        history_y: List[float] = []
         is_oscillating = False
         period = 0.0
         diverged = False
@@ -410,12 +451,23 @@ def ziegler_nichols_tuning(system, setpoint=1.0, dt=0.01, max_time=50.0):
     kp = 0.6 * ku
     ki = 1.2 * ku / tu
     kd = 0.075 * ku * tu
-    
-    logger.info("Ziegler-Nichols PID parameters calculated", extra={"extra_info": {"Kp": kp, "Ki": ki, "Kd": kd}})
-    
+
+    logger.info(
+        "Ziegler-Nichols PID parameters calculated",
+        extra={"extra_info": {"Kp": kp, "Ki": ki, "Kd": kd}},
+    )
+
     return kp, ki, kd
 
-def simulate_and_save(system, controller, filename, setpoint=1.0, dt=0.01, duration=20.0):
+
+def simulate_and_save(
+    system: FirstOrderSystem,
+    controller: PIDController,
+    filename: str,
+    setpoint: float = 1.0,
+    dt: float = 0.01,
+    duration: float = 20.0,
+) -> List[Tuple[float, float, float, float]]:
     """
     Simulates the system with the given controller and saves results to a CSV file.
     

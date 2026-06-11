@@ -4,16 +4,16 @@ from pid import PIDController, FirstOrderSystem, ziegler_nichols_tuning
 
 class TestPID(unittest.TestCase):
     @classmethod
-    def setUpClass(cls):
+    def setUpClass(cls) -> None:
         # Suppress logging output during tests
         logging.disable(logging.CRITICAL)
 
     @classmethod
-    def tearDownClass(cls):
+    def tearDownClass(cls) -> None:
         # Re-enable logging after tests
         logging.disable(logging.NOTSET)
 
-    def test_pid_proportional(self):
+    def test_pid_proportional(self) -> None:
         pid = PIDController(kp=2.0, ki=0.0, kd=0.0)
         u1 = pid.update(setpoint=10.0, pv=0.0, dt=1.0)
         self.assertEqual(u1, 20.0)
@@ -21,14 +21,14 @@ class TestPID(unittest.TestCase):
         u2 = pid.update(setpoint=10.0, pv=5.0, dt=1.0)
         self.assertEqual(u2, 10.0)
 
-    def test_pid_integral(self):
+    def test_pid_integral(self) -> None:
         pid = PIDController(kp=0.0, ki=1.0, kd=0.0)
         u1 = pid.update(setpoint=1.0, pv=0.0, dt=0.5)
         self.assertEqual(u1, 0.5)
         u2 = pid.update(setpoint=1.0, pv=0.0, dt=0.5)
         self.assertEqual(u2, 1.0)
 
-    def test_pid_derivative(self):
+    def test_pid_derivative(self) -> None:
         pid = PIDController(kp=0.0, ki=0.0, kd=1.0)
         pid.update(setpoint=1.0, pv=0.0, dt=1.0) # prev_error initialized
         # error changed from 1.0 to 0.0 (decreased by 1.0)
@@ -42,7 +42,7 @@ class TestPID(unittest.TestCase):
         with self.assertRaises(ValueError):
             pid.update(setpoint=1.0, pv=2.0, dt=-1.0)
 
-    def test_pid_reset(self):
+    def test_pid_reset(self) -> None:
         pid = PIDController(kp=1.0, ki=1.0, kd=1.0)
         pid.update(setpoint=1.0, pv=0.0, dt=1.0)
         self.assertNotEqual(pid.integral, 0.0)
@@ -53,7 +53,7 @@ class TestPID(unittest.TestCase):
         self.assertEqual(pid.prev_error, 0.0)
         self.assertEqual(pid.prev_pv, 0.0)
 
-    def test_pid_output_limits_and_antiwindup(self):
+    def test_pid_output_limits_and_antiwindup(self) -> None:
         pid = PIDController(kp=1.0, ki=1.0, kd=0.0, output_limits=(-10.0, 10.0))
         
         # Drive the integral up to hit the max limit
@@ -69,7 +69,7 @@ class TestPID(unittest.TestCase):
             
         self.assertEqual(u, -10.0)
 
-    def test_first_order_system(self):
+    def test_first_order_system(self) -> None:
         sys = FirstOrderSystem(K=2.0, tau=1.0, dead_time=0.0)
         # Without dead time, step response should start immediately
         y = sys.update(u=1.0, dt=0.1)
@@ -80,7 +80,7 @@ class TestPID(unittest.TestCase):
             y = sys.update(u=1.0, dt=0.1)
         self.assertAlmostEqual(y, 2.0, places=2)
         
-    def test_first_order_system_dead_time(self):
+    def test_first_order_system_dead_time(self) -> None:
         sys = FirstOrderSystem(K=1.0, tau=1.0, dead_time=0.5)
         # With dead time 0.5, y should be 0 for t < 0.5
         for _ in range(5): # t=0.1, 0.2, 0.3, 0.4, 0.5
@@ -91,14 +91,14 @@ class TestPID(unittest.TestCase):
         y = sys.update(u=1.0, dt=0.1)
         self.assertTrue(y > 0.0)
 
-    def test_ziegler_nichols(self):
+    def test_ziegler_nichols(self) -> None:
         sys = FirstOrderSystem(K=1.0, tau=1.0, dead_time=0.5)
         kp, ki, kd = ziegler_nichols_tuning(sys, setpoint=1.0, dt=0.01, max_time=20.0)
         self.assertTrue(kp > 0)
         self.assertTrue(ki > 0)
         self.assertTrue(kd > 0)
 
-    def test_ziegler_nichols_failure(self):
+    def test_ziegler_nichols_failure(self) -> None:
         # A system that won't oscillate properly within the given time or limits
         # High tau and no dead time won't easily oscillate
         sys = FirstOrderSystem(K=0.1, tau=10.0, dead_time=0.0)
@@ -111,7 +111,7 @@ class TestPID(unittest.TestCase):
             self.assertEqual(ki, 0.0)
             self.assertEqual(kd, 0.0)
 
-    def test_simulate_and_save(self):
+    def test_simulate_and_save(self) -> None:
         import os
         sys = FirstOrderSystem(K=1.0, tau=1.0, dead_time=0.5)
         pid = PIDController(kp=1.0, ki=1.0, kd=0.0)
@@ -126,14 +126,14 @@ class TestPID(unittest.TestCase):
         self.assertTrue(os.path.exists(filename))
         self.assertTrue(len(results) > 0)
 
-    def test_detect_oscillations_early_exit(self):
+    def test_detect_oscillations_early_exit(self) -> None:
         from pid import detect_oscillations
         # Not enough samples
         is_osc, period, amp_ratio = detect_oscillations([0.0]*50, 0.1)
         self.assertFalse(is_osc)
         self.assertEqual(period, 0.0)
 
-    def test_invalid_types_and_values(self):
+    def test_invalid_types_and_values(self) -> None:
         # PIDController init
         with self.assertRaises(TypeError):
             PIDController(kp="1.0", ki=0.0, kd=0.0)

@@ -1,6 +1,8 @@
 import logging
 import json
 from datetime import datetime
+from typing import Any, Dict
+
 
 class JSONFormatter(logging.Formatter):
     """
@@ -9,7 +11,7 @@ class JSONFormatter(logging.Formatter):
     This formatter overrides the standard logging format to output log records
     as JSON strings, which is useful for structured log collection systems.
     """
-    def format(self, record):
+    def format(self, record: logging.LogRecord) -> str:
         """
         Formats the specified log record as a JSON string.
         
@@ -19,7 +21,7 @@ class JSONFormatter(logging.Formatter):
         Returns:
             str: The formatted JSON string representing the log record.
         """
-        log_record = {
+        log_record: Dict[str, Any] = {
             "timestamp": datetime.fromtimestamp(record.created).isoformat(),
             "level": record.levelname,
             "name": record.name,
@@ -35,7 +37,7 @@ class JSONFormatter(logging.Formatter):
             
         return json.dumps(log_record)
 
-def configure_logging():
+def configure_logging() -> None:
     """
     Configures the root logger to use the JSON formatter and output to the console.
     
