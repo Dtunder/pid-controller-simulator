@@ -5,6 +5,16 @@ from pid import PIDController, FirstOrderSystem, ziegler_nichols_tuning, simulat
 logger = logging.getLogger(__name__)
 
 def main():
+    """
+    Main entry point for the PID simulation.
+    
+    This function:
+    1. Configures logging.
+    2. Defines a First Order Plus Dead Time (FOPDT) system.
+    3. Uses Ziegler-Nichols tuning to find optimal PID parameters for the system.
+    4. Runs a final simulation with the tuned controller.
+    5. Saves the results to 'results.csv'.
+    """
     configure_logging()
     logger.info("Welcome to pid-controller-simulator!")
     

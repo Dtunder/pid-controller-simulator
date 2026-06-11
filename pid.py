@@ -6,6 +6,20 @@ from collections import deque
 logger = logging.getLogger(__name__)
 
 def _check_type_and_value(val, name, expected_types=(int, float), min_val=None, max_val=None):
+    """
+    Validates the type and value of a parameter.
+    
+    Args:
+        val: The value to check.
+        name (str): The name of the parameter (used in error messages).
+        expected_types (tuple, optional): Allowed types for the value. Defaults to (int, float).
+        min_val (float, optional): The minimum allowed value (inclusive). Defaults to None.
+        max_val (float, optional): The maximum allowed value (inclusive). Defaults to None.
+        
+    Raises:
+        TypeError: If the value is not of the expected types.
+        ValueError: If the value is outside the specified bounds.
+    """
     if not isinstance(val, expected_types):
         err_msg = f"{name} must be of type {expected_types}, got {type(val).__name__}"
         logger.error(err_msg)
@@ -20,7 +34,10 @@ def _check_type_and_value(val, name, expected_types=(int, float), min_val=None, 
         raise ValueError(err_msg)
 
 class PIDController:
-    """A standard PID controller implementation with anti-windup and output limits."""
+    """
+    A standard Proportional-Integral-Derivative (PID) controller implementation 
+    with anti-windup and output limits.
+    """
     
     def __init__(self, kp, ki, kd, output_limits=(None, None)):
         """
@@ -66,7 +83,12 @@ class PIDController:
         logger.info("PIDController initialized", extra={"extra_info": {"kp": self.kp, "ki": self.ki, "kd": self.kd, "output_limits": self.output_limits}})
 
     def reset(self):
-        """Resets the internal state of the PID controller."""
+        """
+        Resets the internal state of the PID controller.
+        
+        Clears the integral accumulator, previous error, and previous process variable.
+        This is useful when restarting a simulation or control sequence.
+        """
         self.integral = 0.0
         self.prev_error = 0.0
         self.prev_pv = 0.0
@@ -126,9 +148,26 @@ class PIDController:
         return output
 
 class FirstOrderSystem:
-    """Models a First Order Plus Dead Time (FOPDT) system."""
+    """
+    Models a First Order Plus Dead Time (FOPDT) system.
+    
+    The system is represented by the differential equation:
+    tau * dy/dt + y(t) = K * u(t - dead_time)
+    """
     
     def __init__(self, K, tau, dead_time):
+        """
+        Initializes the First Order System.
+        
+        Args:
+            K (float): The system gain.
+            tau (float): The system time constant. Must be > 0.
+            dead_time (float): The system delay/dead time. Must be >= 0.
+            
+        Raises:
+            TypeError: If the parameters are not numeric.
+            ValueError: If tau or dead_time are out of valid bounds.
+        """
         _check_type_and_value(K, "K")
         _check_type_and_value(tau, "tau", min_val=1e-9) # tau > 0, slightly larger than 0 to avoid div by zero
         _check_type_and_value(dead_time, "dead_time", min_val=0.0)
@@ -144,13 +183,30 @@ class FirstOrderSystem:
         logger.info("FirstOrderSystem initialized", extra={"extra_info": {"K": self.K, "tau": self.tau, "dead_time": self.dead_time}})
         
     def reset(self):
-        """Resets the system state to initial conditions."""
+        """
+        Resets the system state to initial conditions.
+        
+        Clears the current output value and the history of inputs.
+        """
         self.y = 0.0
         self.history_u.clear()
         logger.debug("FirstOrderSystem state reset")
         
     def update(self, u, dt):
-        """Updates the system state given a new input u and time step dt."""
+        """
+        Updates the system state given a new input and time step.
+        
+        Args:
+            u (float): The control input applied to the system.
+            dt (float): The time step since the last update.
+            
+        Returns:
+            float: The new system output (process variable).
+            
+        Raises:
+            TypeError: If u or dt are not numeric.
+            ValueError: If dt <= 0.
+        """
         _check_type_and_value(u, "u")
         _check_type_and_value(dt, "dt", min_val=0.0)
         if dt <= 0:
@@ -360,6 +416,25 @@ def ziegler_nichols_tuning(system, setpoint=1.0, dt=0.01, max_time=50.0):
     return kp, ki, kd
 
 def simulate_and_save(system, controller, filename, setpoint=1.0, dt=0.01, duration=20.0):
+    """
+    Simulates the system with the given controller and saves results to a CSV file.
+    
+    Args:
+        system (FirstOrderSystem): The system to simulate.
+        controller (PIDController): The controller to manage the system.
+        filename (str): The path to the CSV file where results will be saved.
+        setpoint (float, optional): The target value for the controller. Defaults to 1.0.
+        dt (float, optional): The simulation time step. Defaults to 0.01.
+        duration (float, optional): The total duration of the simulation. Defaults to 20.0.
+        
+    Returns:
+        list: A list of tuples containing (time, setpoint, process_variable, control_variable).
+        
+    Raises:
+        TypeError: If invalid types are provided for arguments.
+        ValueError: If numeric arguments are out of bounds or filename is empty.
+        IOError: If saving to the file fails.
+    """
     if not isinstance(system, FirstOrderSystem):
         err_msg = f"system must be a FirstOrderSystem, got {type(system).__name__}"
         logger.error(err_msg)

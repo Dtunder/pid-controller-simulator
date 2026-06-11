@@ -3,8 +3,22 @@ import json
 from datetime import datetime
 
 class JSONFormatter(logging.Formatter):
-    """Custom JSON formatter for structured logging."""
+    """
+    Custom JSON formatter for structured logging.
+    
+    This formatter overrides the standard logging format to output log records
+    as JSON strings, which is useful for structured log collection systems.
+    """
     def format(self, record):
+        """
+        Formats the specified log record as a JSON string.
+        
+        Args:
+            record (logging.LogRecord): The log record to format.
+            
+        Returns:
+            str: The formatted JSON string representing the log record.
+        """
         log_record = {
             "timestamp": datetime.fromtimestamp(record.created).isoformat(),
             "level": record.levelname,
@@ -22,7 +36,12 @@ class JSONFormatter(logging.Formatter):
         return json.dumps(log_record)
 
 def configure_logging():
-    """Configures the root logger with the JSON formatter."""
+    """
+    Configures the root logger to use the JSON formatter and output to the console.
+    
+    This function sets the logging level to INFO, clears any existing handlers
+    on the root logger, and adds a StreamHandler configured with the JSONFormatter.
+    """
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
     
