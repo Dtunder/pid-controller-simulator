@@ -1,5 +1,6 @@
 import csv
 import math
+from collections import deque
 
 def _check_type_and_value(val, name, expected_types=(int, float), min_val=None, max_val=None):
     if not isinstance(val, expected_types):
@@ -10,7 +11,18 @@ def _check_type_and_value(val, name, expected_types=(int, float), min_val=None, 
         raise ValueError(f"{name} must be <= {max_val}, got {val}")
 
 class PIDController:
+    """A standard PID controller implementation with anti-windup and output limits."""
+    
     def __init__(self, kp, ki, kd, output_limits=(None, None)):
+        """
+        Initializes the PID Controller.
+        
+        Args:
+            kp (float): Proportional gain.
+            ki (float): Integral gain.
+            kd (float): Derivative gain.
+            output_limits (tuple): (min_limit, max_limit) for output bounding.
+        """
         _check_type_and_value(kp, "kp", min_val=0.0)
         _check_type_and_value(ki, "ki", min_val=0.0)
         _check_type_and_value(kd, "kd", min_val=0.0)
@@ -36,11 +48,23 @@ class PIDController:
         self.prev_pv = 0.0
 
     def reset(self):
+        """Resets the internal state of the PID controller."""
         self.integral = 0.0
         self.prev_error = 0.0
         self.prev_pv = 0.0
 
     def update(self, setpoint, pv, dt):
+        """
+        Calculates the new control variable output.
+        
+        Args:
+            setpoint (float): The desired target value.
+            pv (float): The current process variable.
+            dt (float): The time step since the last update.
+            
+        Returns:
+            float: The calculated control output.
+        """
         _check_type_and_value(setpoint, "setpoint")
         _check_type_and_value(pv, "pv")
         _check_type_and_value(dt, "dt", min_val=0.0)
@@ -79,6 +103,8 @@ class PIDController:
         return output
 
 class FirstOrderSystem:
+    """Models a First Order Plus Dead Time (FOPDT) system."""
+    
     def __init__(self, K, tau, dead_time):
         _check_type_and_value(K, "K")
         _check_type_and_value(tau, "tau", min_val=1e-9) # tau > 0, slightly larger than 0 to avoid div by zero
@@ -89,23 +115,38 @@ class FirstOrderSystem:
         self.dead_time = float(dead_time)
         
         self.y = 0.0
-        self.history_u = []
+        self.history_u = deque()
+        self._delay_steps_cache = None
+        self._dt_cache = None
         
     def reset(self):
+        """Resets the system state to initial conditions."""
         self.y = 0.0
-        self.history_u = []
+        self.history_u.clear()
         
     def update(self, u, dt):
+        """Updates the system state given a new input u and time step dt."""
         _check_type_and_value(u, "u")
         _check_type_and_value(dt, "dt", min_val=0.0)
         if dt <= 0:
             raise ValueError(f"dt must be > 0, got {dt}")
             
         self.history_u.append(u)
-        delay_steps = int(self.dead_time / dt)
         
-        if len(self.history_u) > delay_steps:
-            delayed_u = self.history_u[-(delay_steps + 1)]
+        # Calculate delay_steps only if dt changes
+        if dt != self._dt_cache:
+            self._dt_cache = dt
+            self._delay_steps_cache = int(self.dead_time / dt)
+            
+        delay_steps = self._delay_steps_cache
+        
+        # Keep deque bounded to avoid unbounded memory growth
+        max_len = delay_steps + 1
+        while len(self.history_u) > max_len:
+            self.history_u.popleft()
+            
+        if len(self.history_u) >= max_len:
+            delayed_u = self.history_u[0]
         else:
             delayed_u = 0.0
             
@@ -115,28 +156,47 @@ class FirstOrderSystem:
         return self.y
 
 def detect_oscillations(history_y, dt):
+    """
+    Detects if the system output is oscillating at a constant amplitude.
+    
+    Args:
+        history_y (list): The history of the system output.
+        dt (float): The time step.
+        
+    Returns:
+        tuple: (is_oscillating, period, amplitude_ratio)
+    """
     if not isinstance(history_y, list):
         raise TypeError(f"history_y must be a list, got {type(history_y).__name__}")
     _check_type_and_value(dt, "dt", min_val=0.0)
     if dt <= 0:
         raise ValueError(f"dt must be > 0, got {dt}")
         
+    # Needs some buffer to avoid initial transient
+    n = len(history_y)
+    if n < 100:
+        return False, 0.0, 0.0
+        
     # Find peaks and troughs
     peaks = []
     troughs = []
     
-    # Needs some buffer to avoid initial transient
-    if len(history_y) < 100:
-        return False, 0.0, 0.0
-        
-    # Check last N points
-    window = history_y[-min(1000, len(history_y)):]
+    # Check last N points directly without slicing to avoid copying
+    start_idx = max(0, n - 1000)
     
-    for i in range(1, len(window) - 1):
-        if window[i-1] < window[i] > window[i+1]:
-            peaks.append((i, window[i]))
-        if window[i-1] > window[i] < window[i+1]:
-            troughs.append((i, window[i]))
+    prev_val = history_y[start_idx]
+    curr_val = history_y[start_idx + 1]
+    
+    for i in range(start_idx + 1, n - 1):
+        next_val = history_y[i + 1]
+        
+        if prev_val < curr_val > next_val:
+            peaks.append((i - start_idx, curr_val))
+        elif prev_val > curr_val < next_val:
+            troughs.append((i - start_idx, curr_val))
+            
+        prev_val = curr_val
+        curr_val = next_val
             
     if len(peaks) >= 3 and len(troughs) >= 3:
         # Check if amplitudes are relatively constant
@@ -158,6 +218,18 @@ def detect_oscillations(history_y, dt):
     return False, 0.0, 0.0
 
 def ziegler_nichols_tuning(system, setpoint=1.0, dt=0.01, max_time=50.0):
+    """
+    Performs Ziegler-Nichols tuning on a given system to find optimal PID parameters.
+    
+    Args:
+        system (FirstOrderSystem): The system to tune.
+        setpoint (float): The target setpoint for the tuning process.
+        dt (float): The time step for the simulation.
+        max_time (float): The maximum time to run each simulation step.
+        
+    Returns:
+        tuple: (kp, ki, kd) The tuned PID parameters.
+    """
     if not isinstance(system, FirstOrderSystem):
         raise TypeError(f"system must be a FirstOrderSystem, got {type(system).__name__}")
     _check_type_and_value(setpoint, "setpoint")
@@ -184,6 +256,9 @@ def ziegler_nichols_tuning(system, setpoint=1.0, dt=0.01, max_time=50.0):
     low_kp = 0.0
     high_kp = None
     
+    max_steps = int(max_time / dt)
+    half_steps = max_steps // 2
+    
     for iteration in range(20):
         print(f"Step {iteration+1}: Testing Kp = {kp_test:.3f}")
         
@@ -193,16 +268,22 @@ def ziegler_nichols_tuning(system, setpoint=1.0, dt=0.01, max_time=50.0):
         history_y = []
         is_oscillating = False
         period = 0.0
+        diverged = False
         
         # Run simulation
-        for t_step in range(int(max_time / dt)):
+        for t_step in range(max_steps):
             y = system.y
             u = controller.update(setpoint, y, dt)
             y = system.update(u, dt)
             history_y.append(y)
             
+            # Early termination if diverging
+            if abs(y) > 100:
+                diverged = True
+                break
+            
             # Start checking for oscillations after some time
-            if t_step > int(max_time / dt) / 2 and t_step % 100 == 0:
+            if t_step > half_steps and t_step % 100 == 0:
                 is_oscillating, period, amp_ratio = detect_oscillations(history_y, dt)
                 if is_oscillating:
                     break
@@ -214,7 +295,7 @@ def ziegler_nichols_tuning(system, setpoint=1.0, dt=0.01, max_time=50.0):
             ku = kp_test
             tu = period
             break
-        elif final_amp_ratio > 1.05 or any(abs(val) > 100 for val in history_y):
+        elif final_amp_ratio > 1.05 or diverged:
             print("  -> Unstable (growing oscillations or diverging). Decreasing Kp.")
             high_kp = kp_test
             kp_test = (low_kp + high_kp) / 2
