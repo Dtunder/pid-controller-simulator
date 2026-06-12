@@ -1,5 +1,7 @@
 # pid-controller-simulator
 
+![Tests](https://img.shields.io/badge/Tests-Passing-success)
+
 PID simulation environment with Ziegler-Nichols parameter tuning.
 
 This simulator models a First Order Plus Dead Time (FOPDT) system and runs an automated Ziegler-Nichols tuning process to find optimal Proportional, Integral, and Derivative (PID) parameters.
@@ -14,9 +16,9 @@ python main.py
 This script executes the Ziegler-Nichols tuning algorithm to determine the optimal PID parameters for a defined First Order Plus Dead Time (FOPDT) system. Afterward, it runs a step response simulation using the tuned parameters and saves the results to `results.csv`.
 
 ### Run the Tests
-Run the unit tests to ensure all components are functioning correctly:
+Run all unit tests using the master test runner to ensure all components are functioning correctly:
 ```bash
-python -m unittest test_pid.py
+python run_all_tests.py
 ```
 
 ## Configuration Setup

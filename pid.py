@@ -378,8 +378,6 @@ def ziegler_nichols_tuning(
     
     # Try increasing Kp
     kp_test: float = 0.1
-    kp_step: float = 0.1  # noqa: F841
-    max_kp: float = 100.0  # noqa: F841
 
     # Use binary search-like approach or gradual increase
     # To find marginal stability
@@ -418,18 +416,19 @@ def ziegler_nichols_tuning(
             
             # Start checking for oscillations after some time
             if t_step > half_steps and t_step % 100 == 0:
-                is_oscillating, period, amp_ratio = detect_oscillations(history_y, dt)
+                is_oscillating, period, _ = detect_oscillations(history_y, dt)
                 if is_oscillating:
                     break
         
         _, _, final_amp_ratio = detect_oscillations(history_y, dt)
         
         if is_oscillating:
-            logger.info(f"Stable oscillations detected", extra={"extra_info": {"period_Tu": period}})
+            logger.info("Stable oscillations detected", extra={"extra_info": {"period_Tu": period}})
             ku = kp_test
             tu = period
             break
-        elif final_amp_ratio > 1.05 or diverged:
+
+        if final_amp_ratio > 1.05 or diverged:
             logger.debug("Unstable (growing oscillations or diverging). Decreasing Kp.")
             high_kp = kp_test
             kp_test = (low_kp + high_kp) / 2
