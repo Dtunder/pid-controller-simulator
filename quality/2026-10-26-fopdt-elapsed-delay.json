@@ -1,0 +1,73 @@
+{
+  "run_id": "portfolio-quality-2026-10-26-0051",
+  "baseline_commit": "b181548124d36e6f1251a597c267864592a78fb8",
+  "target_repo": "Dtunder/pid-controller-simulator",
+  "branch": "fix/elapsed-time-deadtime-20261026",
+  "candidates": [
+    {
+      "issue": "FOPDT delay uses current dt as number of samples; varying dt applies input early",
+      "status": "FIXED_VERIFIED",
+      "priority": "P1"
+    },
+    {
+      "issue": "FOPDT dead_time/dt truncated, fractional dead_time applies input too early",
+      "status": "FIXED_VERIFIED",
+      "priority": "P1"
+    },
+    {
+      "issue": "FOPDT reset and zero-delay semantics after timestamp change",
+      "status": "REGRESSION_PASS",
+      "priority": "P2"
+    },
+    {
+      "issue": "Portfolio PR #5 and #6 not yet merged/live",
+      "status": "OPEN_UNCHANGED",
+      "priority": "P1"
+    },
+    {
+      "issue": "FOPDT forward Euler stability for dt>=2*tau",
+      "status": "NOT_TESTED_THIS_RUN",
+      "priority": "P2"
+    }
+  ],
+  "tests": {
+    "command_before": "python _baseline_verify.py (loads git show HEAD:pid.py at baseline)",
+    "new_tests_before": {
+      "pass": 2,
+      "fail": 3,
+      "total": 5,
+      "exit_code": 1
+    },
+    "command_after": "python -m unittest -v test_deadtime_variable",
+    "new_tests_after": {
+      "pass": 5,
+      "fail": 0,
+      "total": 5,
+      "exit_code": 0
+    },
+    "full_suite_after": {
+      "pass": 30,
+      "fail": 0,
+      "total": 30,
+      "exit_code": 0
+    },
+    "independent_reference": "20 deterministic scenarios x 100 steps = 2000 comparisons against exact rational timestamp oracle; all passed",
+    "compileall": "PASS",
+    "git_diff_check": "PASS",
+    "runtime": "Python 3.14.4 on DESKTOP-N2ICF0O"
+  },
+  "delta": {
+    "new_tests_passed": 3,
+    "failed_tests": -3,
+    "confirmed_functional_defect_behaviors_fixed": 2,
+    "existing_tests_regressed": 0,
+    "public_portfolio_deployed": 0
+  },
+  "security": "Only public PID code and synthetic test data; no institute data, no paid compute",
+  "notes": "Delay samples are timestamped at interval end; zero-order hold is evaluated at current time minus dead_time. This fixes variable sampling and nonintegral delay. Branch must pass GitHub Actions and review before merging.",
+  "next": [
+    "Check GitHub Actions for this PR and merge if green",
+    "Review stacked portfolio PR #6 -> #5 for privacy and real browser deployment",
+    "Investigate Euler integration stability at large dt"
+  ]
+}
