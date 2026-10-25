@@ -1,5 +1,6 @@
 import csv
 import logging
+import math
 from collections import deque
 from typing import Any, List, Optional, Tuple, Type, Union
 
@@ -31,6 +32,8 @@ def _check_type_and_value(
         err_msg = f"{name} must be of type {expected_types}, got {type(val).__name__}"
         logger.error(err_msg)
         raise TypeError(err_msg)
+    if not math.isfinite(val):
+        raise ValueError(f"{name} must be finite, got {val}")
     if min_val is not None and val < min_val:
         err_msg = f"{name} must be >= {min_val}, got {val}"
         logger.error(err_msg)
@@ -81,6 +84,10 @@ class PIDController:
             err_msg = "output_limits[1] must be None, int, or float"
             logger.error(err_msg)
             raise TypeError(err_msg)
+        if min_limit is not None:
+            _check_type_and_value(min_limit, "output_limits[0]")
+        if max_limit is not None:
+            _check_type_and_value(max_limit, "output_limits[1]")
         if min_limit is not None and max_limit is not None and min_limit > max_limit:
             err_msg = f"min_limit ({min_limit}) cannot be greater than max_limit ({max_limit})"
             logger.error(err_msg)
@@ -94,6 +101,7 @@ class PIDController:
         self.integral: float = 0.0
         self.prev_error: float = 0.0
         self.prev_pv: float = 0.0
+        self._has_previous_measurement = False
         logger.info(
             "PIDController initialized",
             extra={
@@ -116,6 +124,7 @@ class PIDController:
         self.integral = 0.0
         self.prev_error = 0.0
         self.prev_pv = 0.0
+        self._has_previous_measurement = False
         logger.debug("PIDController state reset")
 
     def update(self, setpoint: float, pv: float, dt: float) -> float:
@@ -147,11 +156,10 @@ class PIDController:
         self.integral += error * dt
         i = self.ki * self.integral
         
-        # Derivative (on PV to avoid derivative kick)
-        # Note: on first step prev_pv is 0 if not initialized properly, 
-        # but reset or setting it outside can fix it.
-        # Here we just use standard derivative on error for simplicity
-        d = self.kd * (error - self.prev_error) / dt
+        # Derivative on the measured process variable: a setpoint step must not
+        # create a derivative kick. Initialize history on the first sample.
+        d = (-self.kd * (pv - self.prev_pv) / dt
+             if self._has_previous_measurement else 0.0)
         
         output = p + i + d
         
@@ -174,6 +182,7 @@ class PIDController:
 
         self.prev_error = error
         self.prev_pv = pv
+        self._has_previous_measurement = True
 
         return output
 
