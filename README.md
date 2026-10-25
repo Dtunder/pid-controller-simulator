@@ -1,6 +1,6 @@
 # pid-controller-simulator
 
-![Tests](https://img.shields.io/badge/Tests-Passing-success)
+[![Python regression tests](https://github.com/Dtunder/pid-controller-simulator/actions/workflows/tests.yml/badge.svg)](https://github.com/Dtunder/pid-controller-simulator/actions/workflows/tests.yml)
 
 PID simulation environment with Ziegler-Nichols parameter tuning.
 
