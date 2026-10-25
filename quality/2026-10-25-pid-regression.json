@@ -1,0 +1,59 @@
+{
+  "run_id": "portfolio-quality-20261025-2348-cet-pid",
+  "date_local": "2026-10-25T23:48:53+01:00",
+  "repository": "Dtunder/pid-controller-simulator",
+  "baseline_commit": "4efb49e5ccf6553ea7606529b9eb2c360a04ba44",
+  "problem_candidates": [
+    {
+      "issue": "Derivative kick on setpoint step",
+      "status": "REPRODUCED_AND_PATCHED",
+      "priority": "HIGH"
+    },
+    {
+      "issue": "NaN/Infinity accepted as gains and measurements",
+      "status": "REPRODUCED_AND_PATCHED",
+      "priority": "HIGH"
+    },
+    {
+      "issue": "Invalid NaN actuator output limits",
+      "status": "REPRODUCED_AND_PATCHED",
+      "priority": "MEDIUM"
+    },
+    {
+      "issue": "FOPDT variable dt delay discretization",
+      "status": "UNTESTED",
+      "priority": "MEDIUM"
+    },
+    {
+      "issue": "Static tests passing badge without CI provenance",
+      "status": "NOT_VERIFIED",
+      "priority": "LOW"
+    }
+  ],
+  "reproducer": "python -m unittest test_portfolio_regression -v",
+  "before": {
+    "existing_suite": "18/18 PASS",
+    "new_regressions": "0/7 PASS",
+    "regression_exit_code": 1,
+    "example_setpoint_derivative_output": 200
+  },
+  "after": {
+    "complete_suite": "25/25 PASS",
+    "new_regressions": "7/7 PASS",
+    "regression_exit_code": 0,
+    "example_setpoint_derivative_output": 0,
+    "python_compile_exit_code": 0,
+    "git_diff_check_exit_code": 0
+  },
+  "delta": {
+    "new_regressions_passing": 7,
+    "regression_failures_removed": 7
+  },
+  "changes": [
+    "pid.py",
+    "test_portfolio_regression.py"
+  ],
+  "status": "LOCAL_PATCH_TESTED_PENDING_REMOTE_PR",
+  "notes": "New regression tests were executed on unchanged main before applying the fix and failed 7/7. After the patch, 25/25 total tests passed. No claim of broad numerical robustness or public deployment. Baseline original suite also passed 18/18.",
+  "safety": "Only public repository code and synthetic numeric test data; no personal or institute data."
+}
