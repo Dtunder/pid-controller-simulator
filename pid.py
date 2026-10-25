@@ -217,9 +217,11 @@ class FirstOrderSystem:
         self.dead_time = float(dead_time)
 
         self.y: float = 0.0
+        # Each input is timestamped at the end of its update interval.
+        # Delay is measured in elapsed time, not a count of samples.
         self.history_u: deque = deque()
-        self._delay_steps_cache: Optional[int] = None
-        self._dt_cache: Optional[float] = None
+        self._elapsed_time: float = 0.0
+        self._delayed_u: float = 0.0
         logger.info(
             "FirstOrderSystem initialized",
             extra={"extra_info": {"K": self.K, "tau": self.tau, "dead_time": self.dead_time}},
@@ -233,6 +235,8 @@ class FirstOrderSystem:
         """
         self.y = 0.0
         self.history_u.clear()
+        self._elapsed_time = 0.0
+        self._delayed_u = 0.0
         logger.debug("FirstOrderSystem state reset")
 
     def update(self, u: float, dt: float) -> float:
@@ -257,24 +261,20 @@ class FirstOrderSystem:
             logger.error(err_msg)
             raise ValueError(err_msg)
             
-        self.history_u.append(u)
-        
-        # Calculate delay_steps only if dt changes
-        if dt != self._dt_cache:
-            self._dt_cache = dt
-            self._delay_steps_cache = int(self.dead_time / dt)
-            
-        delay_steps = self._delay_steps_cache
-        
-        # Keep deque bounded to avoid unbounded memory growth
-        max_len = delay_steps + 1
-        while len(self.history_u) > max_len:
-            self.history_u.popleft()
-            
-        if len(self.history_u) >= max_len:
-            delayed_u = self.history_u[0]
-        else:
-            delayed_u = 0.0
+        next_time = self._elapsed_time + dt
+        if not math.isfinite(next_time):
+            raise ValueError("elapsed simulation time must remain finite")
+        self._elapsed_time = next_time
+        self.history_u.append((next_time, u))
+
+        # Zero-order hold: use the most recent sample whose timestamp is
+        # no later than (now - dead_time). This remains correct when dt varies
+        # and when dead_time is not an integer multiple of dt.
+        cutoff = next_time - self.dead_time
+        tolerance = 8 * math.ulp(next_time)
+        while self.history_u and self.history_u[0][0] <= cutoff + tolerance:
+            _, self._delayed_u = self.history_u.popleft()
+        delayed_u = self._delayed_u
             
         # Euler integration for dy/dt = (K * u(t-L) - y) / tau
         dy = (self.K * delayed_u - self.y) / self.tau
