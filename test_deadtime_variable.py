@@ -1,3 +1,4 @@
+import math
 import random
 import unittest
 from fractions import Fraction
@@ -12,14 +13,14 @@ class TestDeadTimeVariableStep(unittest.TestCase):
         sequence = [(1, 0.1), (2, 0.2), (3, 0.25), (4, 0.1), (5, 0.1)]
         actual = [s.update(u, dt) for u, dt in sequence]
         self.assertEqual(actual[:3], [0, 0, 0])
-        self.assertAlmostEqual(actual[3], 0.1, places=10)
-        self.assertAlmostEqual(actual[4], 0.19, places=10)
+        self.assertAlmostEqual(actual[3], -math.expm1(-0.1), places=10)
+        self.assertAlmostEqual(actual[4], -math.expm1(-0.2), places=10)
 
     def test_fractional_delay_does_not_round_down(self):
         s = FirstOrderSystem(K=1, tau=1, dead_time=0.75)
         actual = [s.update(1, 0.5) for _ in range(3)]
         self.assertEqual(actual[:2], [0, 0])
-        self.assertAlmostEqual(actual[2], 0.5, places=10)
+        self.assertAlmostEqual(actual[2], -math.expm1(-0.5), places=10)
 
     def test_reset_clears_timing_history(self):
         s = FirstOrderSystem(K=1, tau=1, dead_time=0.5)
@@ -31,7 +32,7 @@ class TestDeadTimeVariableStep(unittest.TestCase):
 
     def test_zero_delay_remains_immediate_and_bounded(self):
         s = FirstOrderSystem(K=2, tau=1, dead_time=0)
-        self.assertAlmostEqual(s.update(3, 0.1), 0.6, places=10)
+        self.assertAlmostEqual(s.update(3, 0.1), 6 * -math.expm1(-0.1), places=10)
         for _ in range(100):
             s.update(1, 0.1)
         self.assertLessEqual(len(s.history_u), 1)
@@ -57,7 +58,8 @@ class TestDeadTimeVariableStep(unittest.TestCase):
                 cutoff = now - Fraction(delay)
                 delayed = next((v for timestamp, v in reversed(history)
                                 if timestamp <= cutoff), 0.0)
-                reference_y += ((1.25 * delayed - reference_y) / 1.2) * dt
+                alpha = -math.expm1(-dt / 1.2)
+                reference_y = (1 - alpha) * reference_y + alpha * 1.25 * delayed
                 actual = s.update(u, dt)
                 self.assertAlmostEqual(
                     actual, reference_y, places=9,

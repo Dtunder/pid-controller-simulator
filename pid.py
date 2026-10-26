@@ -197,7 +197,7 @@ class FirstOrderSystem:
     tau * dy/dt + y(t) = K * u(t - dead_time)
     """
 
-    def __init__(self, K: float, tau: float, dead_time: float) -> None:
+    def __init__(self, K: float, tau: float, dead_time: float, integration_method: str = "exact") -> None:
         """
         Initializes the First Order System.
         
@@ -205,7 +205,8 @@ class FirstOrderSystem:
             K (float): The system gain.
             tau (float): The system time constant. Must be > 0.
             dead_time (float): The system delay/dead time. Must be >= 0.
-            
+            integration_method (str): 'exact' (default) or legacy 'euler'.
+
         Raises:
             TypeError: If the parameters are not numeric.
             ValueError: If tau or dead_time are out of valid bounds.
@@ -213,7 +214,10 @@ class FirstOrderSystem:
         _check_type_and_value(K, "K")
         _check_type_and_value(tau, "tau", min_val=1e-9) # tau > 0, slightly larger than 0 to avoid div by zero
         _check_type_and_value(dead_time, "dead_time", min_val=0.0)
-        
+        if integration_method not in ("exact", "euler"):
+            raise ValueError("integration_method must be 'exact' or 'euler'")
+
+        self.integration_method = integration_method
         self.K = float(K)
         self.tau = float(tau)
         self.dead_time = float(dead_time)
@@ -266,21 +270,45 @@ class FirstOrderSystem:
         next_time = self._elapsed_time + dt
         if not math.isfinite(next_time):
             raise ValueError("elapsed simulation time must remain finite")
-        self._elapsed_time = next_time
-        self.history_u.append((next_time, u))
 
-        # Zero-order hold: use the most recent sample whose timestamp is
-        # no later than (now - dead_time). This remains correct when dt varies
-        # and when dead_time is not an integer multiple of dt.
+        # Determine the delayed zero-order-held input without mutating state.
+        # The newly supplied sample has timestamp next_time.
         cutoff = next_time - self.dead_time
         tolerance = 8 * math.ulp(next_time)
-        while self.history_u and self.history_u[0][0] <= cutoff + tolerance:
-            _, self._delayed_u = self.history_u.popleft()
+        consume = 0
         delayed_u = self._delayed_u
-            
-        # Euler integration for dy/dt = (K * u(t-L) - y) / tau
-        dy = (self.K * delayed_u - self.y) / self.tau
-        self.y += dy * dt
+        for timestamp, old_u in self.history_u:
+            if timestamp > cutoff + tolerance:
+                break
+            delayed_u = old_u
+            consume += 1
+        new_sample_ready = next_time <= cutoff + tolerance
+        if new_sample_ready:
+            delayed_u = u
+
+        target = self.K * delayed_u
+        if not math.isfinite(target):
+            raise ValueError("system arithmetic must remain finite")
+        if self.integration_method == "exact":
+            # Exact solution for constant delayed input over this interval.
+            # expm1 avoids cancellation for tiny dt/tau and stays stable
+            # for arbitrarily large finite dt/tau.
+            alpha = -math.expm1(-dt / self.tau)
+            next_y = (1.0 - alpha) * self.y + alpha * target
+        else:
+            # Explicit legacy Euler mode, for reproducible older results.
+            next_y = self.y + ((target - self.y) / self.tau) * dt
+        if not math.isfinite(next_y):
+            raise ValueError("system arithmetic must remain finite")
+
+        # Commit history and state only after successful arithmetic.
+        for _ in range(consume):
+            self.history_u.popleft()
+        if not new_sample_ready:
+            self.history_u.append((next_time, u))
+        self._elapsed_time = next_time
+        self._delayed_u = delayed_u
+        self.y = next_y
         return self.y
 
 
