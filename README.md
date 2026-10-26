@@ -80,8 +80,8 @@ A standard Proportional-Integral-Derivative (PID) controller implementation with
 #### `FirstOrderSystem`
 Models a First Order Plus Dead Time (FOPDT) system.
 
-- **`__init__(self, K, tau, dead_time)`**
-  Initializes the system with gain `K`, time constant `tau`, and `dead_time`.
+- **`__init__(self, K, tau, dead_time, integration_method="exact")`**
+  Initializes the system with gain `K`, time constant `tau`, and `dead_time`. The default `exact` method uses the analytical first-order solution for the held delayed input; it remains bounded for large time steps. Select `integration_method="euler"` only to reproduce historical explicit-Euler simulation results (which can become unstable when `dt/tau` is large). This changes numerical outputs compared with earlier releases; use `euler` if you require legacy reproducibility.
 - **`reset(self)`**
   Resets the internal state and output values.
 - **`update(self, u, dt)`**

@@ -1,0 +1,63 @@
+{
+  "run_id": "portfolio-quality-2026-10-26-0248-europe-berlin",
+  "repo": "Dtunder/pid-controller-simulator",
+  "baseline_main": "0c0b1a70",
+  "date_local": "2026-10-26T02:48:18+01:00",
+  "candidates": [
+    {
+      "issue": "Unstable explicit Euler at dt/tau=3",
+      "status": "REPRODUCED_FIXED",
+      "evidence": "u=1 K=tau=1: before first y=3, exact oracle 0.950212931632136"
+    },
+    {
+      "issue": "Euler drift on variable dt",
+      "status": "REPRODUCED_FIXED",
+      "evidence": "dt=.05 K=2 tau=1.5: before .06666666666666667, oracle .0655677990359882"
+    },
+    {
+      "issue": "Finite very large dt creates nonfinite state",
+      "status": "REPRODUCED_FIXED",
+      "evidence": "dt=1e308 K=-2: before -Infinity, after -2"
+    },
+    {
+      "issue": "Overflow target corrupts state/history",
+      "status": "REPRODUCED_FIXED",
+      "evidence": "K=u=1e308: before no exception and mutated state, after ValueError and unchanged state"
+    },
+    {
+      "issue": "Pending portfolio PR #5/#6 need integration",
+      "status": "DEFERRED",
+      "evidence": "GitHub PR search: both open, stacked"
+    }
+  ],
+  "red": {
+    "command": "python -m pytest -q test_first_order_exact.py",
+    "results": "0/4 passed, 4 failed",
+    "exit_code": 1
+  },
+  "green": {
+    "command": "python -m pytest -q",
+    "results": "42/42 passed",
+    "exit_code": 0
+  },
+  "regression": {
+    "command": "python run_all_tests.py",
+    "results": "42/42 passed",
+    "exit_code": 0
+  },
+  "other_checks": {
+    "compileall_exit": 0,
+    "git_diff_check_exit": 0,
+    "independent_fraction_time_reference": "20 cases x 100 steps = 2000 checks, passed"
+  },
+  "before_existing_suite": "36/36 passed",
+  "after_suite": "42/42 passed",
+  "delta": {
+    "new_verified_regressions": 4,
+    "failed_new_regressions_before": 4,
+    "failed_new_regressions_after": 0
+  },
+  "notes": "Default exact zero-order-hold first-order integration; explicit integration_method='euler' preserves historical output. No private data or credentials. No public deployment claimed until merged and CI rechecked.",
+  "status": "PATCH_TESTED_LOCAL",
+  "next": "Open PR, verify GitHub Actions on PR and main; then inspect stacked portfolio PRs for release readiness."
+}
