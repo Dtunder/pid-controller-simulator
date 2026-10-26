@@ -1,0 +1,79 @@
+{
+  "run_id": "2026-10-26T01:50:22+01:00-pid-finite-state",
+  "repository": "Dtunder/pid-controller-simulator",
+  "baseline_commit": "ea1aea77d6d68968ae35f1513d0f163f8d212128",
+  "candidate_problems": [
+    {
+      "issue": "Finite PID inputs can overflow arithmetic and corrupt controller state",
+      "status": "REPRODUCED_AND_FIXED",
+      "priority": "high"
+    },
+    {
+      "issue": "FirstOrderSystem explicit Euler update diverges for dt=3*tau; baseline y=3,-3",
+      "status": "REPRODUCED_NOT_FIXED",
+      "priority": "medium",
+      "note": "Requires separate integration-method design review; existing tests assert Euler outputs."
+    },
+    {
+      "issue": "Portfolio PR #5 and #6 not deployed",
+      "status": "OPEN_SEPARATE_WORK",
+      "priority": "high"
+    },
+    {
+      "issue": "Public README-only projects lack executable evidence",
+      "status": "AUDIT_PENDING",
+      "priority": "medium"
+    }
+  ],
+  "change": "Compute PID arithmetic transactionally; reject nonfinite intermediate values before committing integral and measurement history.",
+  "red": {
+    "command": "python -m unittest test_pid_finite_state -v",
+    "python_version": "3.14.4",
+    "tests_passed": 0,
+    "tests_total": 6,
+    "exit_code": 1
+  },
+  "green": {
+    "command": "python -m unittest test_pid_finite_state -v",
+    "tests_passed": 6,
+    "tests_total": 6,
+    "exit_code": 0
+  },
+  "regression": {
+    "command": "python -m unittest discover -p 'test_*.py' -v",
+    "tests_passed": 36,
+    "tests_total": 36,
+    "exit_code": 0,
+    "baseline_tests_passed": 30,
+    "baseline_tests_total": 30
+  },
+  "independent_reference": {
+    "command": "python pid_reference_check.py",
+    "seed": 20261026,
+    "scenarios": 500,
+    "steps_each": 4,
+    "comparisons_passed": 2000,
+    "exit_code": 0,
+    "note": "Deterministic reference script executed in isolated temporary workspace; not committed."
+  },
+  "syntax": {
+    "command": "python -m py_compile pid.py test_pid_finite_state.py",
+    "exit_code": 0
+  },
+  "diff_check": {
+    "command": "git diff --check",
+    "exit_code": 0
+  },
+  "net_delta": {
+    "previously_failing_regressions_now_passing": 6,
+    "total_test_count_increase": 6,
+    "confirmed_live_demos": 0,
+    "new_projects_published": 0
+  },
+  "deployment": {
+    "state": "not yet merged at record creation",
+    "website_changed": false
+  },
+  "security": "No private data or tokens included; no external service calls by tests.",
+  "next": "Assess FOPDT large-dt Euler stability with compatibility-preserving design and independent analytical reference."
+}

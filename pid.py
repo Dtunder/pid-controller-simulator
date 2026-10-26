@@ -147,39 +147,41 @@ class PIDController:
             logger.error(err_msg)
             raise ValueError(err_msg)
             
+        # Calculate on temporary values first. Finite input parameters can
+        # still overflow during subtraction, multiplication, or accumulation.
+        # Never corrupt the controller's stored state on arithmetic failure.
         error = setpoint - pv
-        
-        # Proportional
         p = self.kp * error
-        
-        # Integral
-        self.integral += error * dt
-        i = self.ki * self.integral
-        
-        # Derivative on the measured process variable: a setpoint step must not
-        # create a derivative kick. Initialize history on the first sample.
+        integral_step = error * dt
+        candidate_integral = self.integral + integral_step
+        i = self.ki * candidate_integral
+
+        # Derivative on the measured process variable avoids setpoint kick.
         d = (-self.kd * (pv - self.prev_pv) / dt
              if self._has_previous_measurement else 0.0)
-        
         output = p + i + d
-        
-        # Anti-windup and limits
+        if not all(math.isfinite(term) for term in
+                   (error, p, integral_step, candidate_integral, i, d, output)):
+            raise ValueError("PID arithmetic must remain finite")
+
+        # Apply output limits and anti-windup only after all calculations pass.
         min_limit, max_limit = self.output_limits
         if max_limit is not None and output > max_limit:
             output = max_limit
-            self.integral -= error * dt  # anti-windup
+            candidate_integral = self.integral
             logger.debug(
                 "Output hit max limit, applying anti-windup",
                 extra={"extra_info": {"max_limit": max_limit, "output": output}},
             )
         elif min_limit is not None and output < min_limit:
             output = min_limit
-            self.integral -= error * dt  # anti-windup
+            candidate_integral = self.integral
             logger.debug(
                 "Output hit min limit, applying anti-windup",
                 extra={"extra_info": {"min_limit": min_limit, "output": output}},
             )
 
+        self.integral = candidate_integral
         self.prev_error = error
         self.prev_pv = pv
         self._has_previous_measurement = True
