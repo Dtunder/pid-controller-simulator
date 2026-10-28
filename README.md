@@ -6,6 +6,27 @@ PID simulation environment with Ziegler-Nichols parameter tuning.
 
 This simulator models a First Order Plus Dead Time (FOPDT) system and runs an automated Ziegler-Nichols tuning process to find optimal Proportional, Integral, and Derivative (PID) parameters.
 
+## Results
+
+Plant: `G(s) = 1·e^(-0.5s) / (1s + 1)` (K = 1, τ = 1 s, θ = 0.5 s, θ/τ = 0.5), unit setpoint step, Δt = 0.01 s, 20 s.
+The closed-loop Ziegler-Nichols experiment in `pid.py` finds Ku = 3.80 and Tu = 1.73 s (analytic values for this plant: 3.81 and 1.71 s).
+P, PI and PID use the Ziegler-Nichols ultimate-cycle rules; the conservative reference is a SIMC PI controller (Skogestad 2003, τc = θ). Reproduce with `python analysis.py`.
+
+![Step response](results/step_response.png)
+
+| Controller | Kp | Ki | Kd | Rise time 10-90 % [s] | Overshoot [%] | Settling time 2 % [s] | Steady-state error | IAE |
+|---|---|---|---|---|---|---|---|---|
+| P (Z-N)   | 1.900 | 0.000 | 0.000 | 0.337 | 40.1 | 4.53 | 0.345 | 7.234 |
+| PI (Z-N)  | 1.710 | 1.186 | 0.000 | 0.511 | 19.5 | 5.08 | 0.000 | 1.082 |
+| PID (Z-N) | 2.280 | 2.636 | 0.493 | 0.339 | 39.4 | 3.04 | 0.000 | 1.067 |
+| PI (SIMC) | 1.000 | 1.000 | 0.000 | 0.943 | 4.4  | 3.04 | 0.000 | 1.084 |
+
+Source: [`results/step_metrics.csv`](results/step_metrics.csv) (values rounded). Rise time, overshoot and settling time are measured relative to each loop's own final value, so for the P controller they describe convergence to 0.655, not to the setpoint.
+
+**Interpretation.** Ziegler-Nichols PID rises about three times faster than SIMC PI (0.34 s vs. 0.94 s) but overshoots by 39 % instead of 4 %; both enter the 2 % band for good at the same 3.04 s and reach almost the same IAE, so the extra aggressiveness buys little for a setpoint step. The pure P controller keeps the expected offset 1/(1 + K·Kp) = 0.345, which only integral action removes. The dead time sets the limit: no controller can react before t = θ = 0.5 s, and the ultimate gain of 3.8 caps the usable loop gain, which is why the Z-N rules (designed for quarter-amplitude decay) land near 40 % overshoot on a plant with θ/τ = 0.5.
+
+**Disturbance rejection.** A second run adds an input load step d = 0.5 at t = 10 s ([figure](results/disturbance_rejection.png), [`results/disturbance_metrics.csv`](results/disturbance_metrics.csv)). Here the aggressive tuning pays off: Z-N PID has the lowest peak deviation (0.201) and the lowest IAE (0.201), and returns to the 2 % band 2.56 s after the step, versus 4.07 s for SIMC PI and 4.68 s for Z-N PI. The P controller does not compensate the load; its offset settles at 0.172 instead of returning to the setpoint.
+
 ## CLI Instructions
 
 ### Run the Simulator
@@ -14,6 +35,20 @@ Run the simulator and tuning process using:
 python main.py
 ```
 This script executes the Ziegler-Nichols tuning algorithm to determine the optimal PID parameters for a defined First Order Plus Dead Time (FOPDT) system. Afterward, it runs a step response simulation using the tuned parameters and saves the results to `results.csv`.
+
+### Run the Analysis
+```bash
+pip install -r requirements.txt
+python analysis.py
+```
+Writes `results/step_metrics.csv`, `results/step_response.png`, `results/disturbance_metrics.csv` and `results/disturbance_rejection.png`.
+
+### Run the Analysis
+```bash
+pip install -r requirements.txt
+python analysis.py
+```
+Writes `results/step_metrics.csv`, `results/step_response.png`, `results/disturbance_metrics.csv` and `results/disturbance_rejection.png`.
 
 ### Run the Tests
 Run all unit tests using the master test runner to ensure all components are functioning correctly:
